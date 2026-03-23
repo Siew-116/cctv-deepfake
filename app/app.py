@@ -12,18 +12,16 @@ from werkzeug.exceptions import RequestEntityTooLarge
 import traceback
 
 app = Flask(__name__, static_folder='static', template_folder='templates')
-
 @app.route('/')
 def index():
     return render_template('index.html')
-
 # ==============================
 # CONFIG
 # ==============================
 UPLOAD_FOLDER = 'uploads'
 os.makedirs(UPLOAD_FOLDER, exist_ok=True)
 
-app.config['MAX_CONTENT_LENGTH'] = 500 * 1024 * 1024
+app.config['MAX_CONTENT_LENGTH'] = 100 * 1024 * 1024
 
 # ==============================
 # Load Models
@@ -47,7 +45,7 @@ else:
     print("Warning: Log anomaly model not found!")
 
 # ==============================
-# Deepfake Detection (OPTIMIZED)
+# Deepfake Detection
 # ==============================
 def detect_deepfake(video_path, max_frames=2, threshold=0.5):
 
@@ -55,30 +53,30 @@ def detect_deepfake(video_path, max_frames=2, threshold=0.5):
         return None, None, "Deepfake model not loaded"
 
     cap = cv2.VideoCapture(video_path)
-
-    # Reduce decode resolution (memory optimization)
-    cap.set(cv2.CAP_PROP_FRAME_WIDTH, 320)
-    cap.set(cv2.CAP_PROP_FRAME_HEIGHT, 240)
+    frames = []
 
     total_frames = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
 
     if total_frames == 0:
-        cap.release()
         return None, None, "Cannot read video frames"
 
     indices = np.linspace(0, total_frames - 1, max_frames).astype(int)
 
-    frame_preds = []
-
     for idx in indices:
         cap.set(cv2.CAP_PROP_POS_FRAMES, idx)
         ret, frame = cap.read()
+        if ret:
+            frames.append(frame)
 
-        if not ret:
-            continue
+    cap.release()
 
-        # SAME LOGIC (only resized smaller for efficiency)
-        img = cv2.resize(frame, (160, 160))   # was (224,224)
+    if len(frames) == 0:
+        return None, None, "No frames found in video"
+
+    frame_preds = []
+
+    for frame in frames:
+        img = cv2.resize(frame, (160, 160))
         img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
         img = img / 255.0
         img = np.expand_dims(img, axis=0)
@@ -87,25 +85,17 @@ def detect_deepfake(video_path, max_frames=2, threshold=0.5):
 
         print("Frame prediction:", pred)
 
+        # assume: 1 = FAKE, 0 = REAL
         fake_score = float(pred)
+
         frame_preds.append(fake_score)
-
-        # free memory immediately
         del frame, img
-        gc.collect()
-
-    cap.release()
-
-    if len(frame_preds) == 0:
-        return None, None, "No frames found in video"
 
     visual_score = float(np.mean(frame_preds))
     print("FINAL SCORE:", visual_score)
 
     video_label = "Fake" if visual_score > threshold else "Real"
-
     gc.collect()
-
     return visual_score, video_label, None
 
 # ==============================
@@ -154,7 +144,6 @@ def handle_large_file(e):
 def upload_files():
     process = psutil.Process(os.getpid())
     print(f"Memory before: {process.memory_info().rss / 1024 / 1024:.1f} MB")
-
     try:
         if 'video_file' not in request.files:
             return jsonify({'status':'error','message':'video_file missing'}), 400
@@ -195,16 +184,14 @@ def upload_files():
                 response['suspicious_logs'] = suspicious_logs
         else:
             response['log_status'] = 'not_provided'
-
         print(f"Memory after: {process.memory_info().rss / 1024 / 1024:.1f} MB")
-
         gc.collect()
-
         return jsonify(response)
-
+    
     except Exception as e:
         traceback.print_exc()
         return jsonify({'status':'error','message':str(e)}), 500
+    
 
 # ==============================
 # Run
