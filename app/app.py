@@ -53,28 +53,13 @@ def detect_deepfake(video_path, max_frames=3, threshold=0.5):
         return None, None, "Deepfake model not loaded"
 
     cap = cv2.VideoCapture(video_path)
-    frames = []
-
-    total_frames = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
-
-    if total_frames == 0:
-        return None, None, "Cannot read video frames"
-
-    indices = np.linspace(0, total_frames - 1, max_frames).astype(int)
-
-    for idx in indices:
-        cap.set(cv2.CAP_PROP_POS_FRAMES, idx)
-        ret, frame = cap.read()
-        if ret:
-            frames.append(frame)
-
-    cap.release()
-
-    if len(frames) == 0:
-        return None, None, "No frames found in video"
-
+    
     frame_preds = []
     total_frames = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
+    if total_frames == 0:
+        cap.release()
+        return None, None, "Cannot read video frames"
+
     indices = np.linspace(0, total_frames - 1, max_frames).astype(int)
 
     for idx in indices:
@@ -94,6 +79,7 @@ def detect_deepfake(video_path, max_frames=3, threshold=0.5):
 
         del frame, img
         gc.collect()
+    cap.release()
     visual_score = float(np.mean(frame_preds))
     print("FINAL SCORE:", visual_score)
 
