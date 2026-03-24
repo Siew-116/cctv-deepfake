@@ -47,7 +47,7 @@ else:
 # ==============================
 # Deepfake Detection
 # ==============================
-def detect_deepfake(video_path, max_frames=2, threshold=0.5):
+def detect_deepfake(video_path, max_frames=3, threshold=0.5):
 
     if deepfake_model is None:
         return None, None, "Deepfake model not loaded"
