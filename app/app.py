@@ -47,7 +47,7 @@ else:
 # ==============================
 # Deepfake Detection
 # ==============================
-def detect_deepfake(video_path, max_frames=2, threshold=0.5):
+def detect_deepfake(video_path, max_frames=1, threshold=0.5):
 
     if deepfake_model is None:
         return None, None, "Deepfake model not loaded"
@@ -74,28 +74,30 @@ def detect_deepfake(video_path, max_frames=2, threshold=0.5):
         return None, None, "No frames found in video"
 
     frame_preds = []
+    total_frames = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
+    indices = np.linspace(0, total_frames - 1, max_frames).astype(int)
 
-    for frame in frames:
+    for idx in indices:
+        cap.set(cv2.CAP_PROP_POS_FRAMES, idx)
+        ret, frame = cap.read()
+        if not ret:
+            continue
+
         img = cv2.resize(frame, (224, 224))
         img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
         img = img / 255.0
         img = np.expand_dims(img, axis=0)
 
         pred = deepfake_model.predict(img, verbose=0)[0][0]
+        frame_preds.append(float(pred))
 
-        print("Frame prediction:", pred)
-
-        # assume: 1 = FAKE, 0 = REAL
-        fake_score = float(pred)
-
-        frame_preds.append(fake_score)
         del frame, img
-
+        gc.collect()
     visual_score = float(np.mean(frame_preds))
     print("FINAL SCORE:", visual_score)
 
     video_label = "Fake" if visual_score > threshold else "Real"
-    gc.collect()
+    
     return visual_score, video_label, None
 
 # ==============================
@@ -197,4 +199,5 @@ def upload_files():
 # Run
 # ==============================
 if __name__ == '__main__':
-    app.run(host='0.0.0.0', port=5000, debug=False, threaded=True, use_reloader=False)
+    port = int(os.environ.get('PORT', 5000))
+    app.run(host='0.0.0.0', port=port, debug=False, threaded=True, use_reloader=False)
