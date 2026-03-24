@@ -53,22 +53,34 @@ def detect_deepfake(video_path, max_frames=3, threshold=0.5):
         return None, None, "Deepfake model not loaded"
 
     cap = cv2.VideoCapture(video_path)
+    frames = []
 
     total_frames = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
+
     if total_frames == 0:
-        cap.release()
         return None, None, "Cannot read video frames"
 
     indices = np.linspace(0, total_frames - 1, max_frames).astype(int)
 
+    for idx in indices:
+        cap.set(cv2.CAP_PROP_POS_FRAMES, idx)
+        ret, frame = cap.read()
+        if ret:
+            frames.append(frame)
+
+    cap.release()
+
+    if len(frames) == 0:
+        return None, None, "No frames found in video"
+
     frame_preds = []
+    total_frames = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
+    indices = np.linspace(0, total_frames - 1, max_frames).astype(int)
 
     for idx in indices:
         cap.set(cv2.CAP_PROP_POS_FRAMES, idx)
         ret, frame = cap.read()
-
         if not ret:
-            print(f"[DEBUG] Failed to read frame {idx}")
             continue
 
         img = cv2.resize(frame, (224, 224))
@@ -77,23 +89,16 @@ def detect_deepfake(video_path, max_frames=3, threshold=0.5):
         img = np.expand_dims(img, axis=0)
 
         pred = deepfake_model.predict(img, verbose=0)[0][0]
-        print(f"[DEBUG] Raw prediction: {pred}")
+        print("[DEBUG] Raw Pred:", pred)
         frame_preds.append(float(pred))
 
         del frame, img
         gc.collect()
-
-    cap.release()
-
-    #  handle empty predictions (prevents NaN)
-    if len(frame_preds) == 0:
-        return None, None, "No valid frames processed"
-
     visual_score = float(np.mean(frame_preds))
     print("FINAL SCORE:", visual_score)
 
     video_label = "Fake" if visual_score > threshold else "Real"
-
+    
     return visual_score, video_label, None
 
 # ==============================
