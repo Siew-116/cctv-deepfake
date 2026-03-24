@@ -76,7 +76,7 @@ def detect_deepfake(video_path, max_frames=2, threshold=0.5):
     frame_preds = []
 
     for frame in frames:
-        img = cv2.resize(frame, (160, 160))
+        img = cv2.resize(frame, (224, 224))
         img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
         img = img / 255.0
         img = np.expand_dims(img, axis=0)
