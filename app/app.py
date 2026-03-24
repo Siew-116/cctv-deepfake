@@ -77,6 +77,7 @@ def detect_deepfake(video_path, max_frames=3, threshold=0.5):
         img = np.expand_dims(img, axis=0)
 
         pred = deepfake_model.predict(img, verbose=0)[0][0]
+        print(f"[DEBUG] Raw prediction: {pred}")
         frame_preds.append(float(pred))
 
         del frame, img
